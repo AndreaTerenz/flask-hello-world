@@ -14,4 +14,4 @@ def echo(ws):
     while True:
         data = ws.receive()
         print(data)
-        ws.send(data)
+        ws.send("GIANFRANCESCO")
