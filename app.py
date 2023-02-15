@@ -1,3 +1,6 @@
+import time
+
+import simple_websocket
 from flask import Flask
 from flask_sock import Sock
 
@@ -11,7 +14,14 @@ def hello_world():
 
 @sock.route('/ws')
 def echo(ws):
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    count = 0
     while True:
-        data = ws.receive()
-        print(data)
-        ws.send("GIANFRANCESCO")
+        try:
+            data = ws.receive()
+            print(data)
+            ws.send(f"Echo: {data}")
+            count += 1
+        except simple_websocket.ConnectionClosed:
+            print("Connection closed")
+            return ""
