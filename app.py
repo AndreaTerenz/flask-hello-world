@@ -1,7 +1,12 @@
-import simple_websocket
-from lobby import create_lobby, join_lobby
-from flask import Flask, Response
+import json, events, os
+from icecream import ic
+from lobby import add_user, UserAlreadyExists, LobbyNotFound
+from simple_websocket import ConnectionClosed
+from flask import Flask
 from flask_sock import Sock
+
+if os.getenv("DEPLOYED"):
+    ic.disable()
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -10,36 +15,67 @@ sock = Sock(app)
 def hello_world():
     return 'Hello, World!'
 
-@app.route("/create-lobby/<user_id>", methods=["GET"])
-def create_lobby_route(user_id):
-    lobby_id = create_lobby(initial_user=user_id)
-    return Response(lobby_id, status= (200 if lobby_id != "" else 400))
-
-@app.route("/join-lobby/<user_id>/<lobby_id>", methods=["GET"])
-def join_lobby_route(user_id, lobby_id):
-    ok = join_lobby(user=user_id, lobby_id=lobby_id)
-    return Response(lobby_id, status= (200 if ok else 400))
-
-@sock.route('/echo')
-def echo(ws):
-    count = 0
-    print("AUAUAUAUAUA")
+@sock.route("/game-socket")
+def game_socket(ws):
     while True:
         try:
-            data = ws.receive()
-            print(data)
-            ws.send(f"Echo: {data}")
-        except simple_websocket.ConnectionClosed:
+            data = json.loads(ws.receive())
+            msg_type = data.get("type")
+            msg_body = data.get("body")
+
+            if (msg_type is None) or (msg_body is None):
+                ws.send("")
+                continue
+
+            packet = f"Echo: {data}"
+
+            match msg_type:
+                case "NEW_GAME":
+                    packet = events.emit_event("NEW_GAME", [ws, msg_body])
+                case "JOIN_GAME":
+                    packet = events.emit_event("JOIN_GAME", [ws, msg_body])
+                case _:
+                    pass
+
+            ws.send(packet)
+        except ConnectionClosed:
             print("Connection closed")
             return ""
 
-@sock.route("/ws")
-def socket(ws):
-    while True:
-        try:
-            data = ws.receive()
-            print(data)
-            ws.send(f"Echo: {data}")
-        except simple_websocket.ConnectionClosed:
-            print("Connection closed")
-            return ""
+@events.on("NEW_GAME", make_main=True)
+def on_new_game(data) -> str:
+    ws = data[0]
+    msg = data[1]
+
+    user_id = msg["user_id"]
+
+    try:
+        lobby_id, _ = add_user(name=user_id, socket=ws)
+
+        return json.dumps({
+            "lobby_id": lobby_id,
+            "players": [user_id]
+        })
+    except UserAlreadyExists:
+        return ""
+
+@events.on("JOIN_GAME", make_main=True)
+def on_join_game(data) -> str:
+    ws = data[0]
+    msg = data[1]
+
+    user_id = msg["user_id"]
+    lobby_id = msg.get("lobby_id", "")
+
+    if lobby_id == "":
+        return ""
+
+    try:
+        lobby_id, players = add_user(name=user_id, socket=ws, lobby_id=lobby_id)
+
+        return json.dumps({
+            "lobby_id": lobby_id,
+            "players": players
+        })
+    except LobbyNotFound | UserAlreadyExists:
+        return ""
