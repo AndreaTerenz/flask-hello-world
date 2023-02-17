@@ -29,13 +29,11 @@ def game_socket(ws):
 
             packet = f"Echo: {data}"
 
-            match msg_type:
-                case "NEW_GAME":
-                    packet = events.emit_event("NEW_GAME", [ws, msg_body])
-                case "JOIN_GAME":
-                    packet = events.emit_event("JOIN_GAME", [ws, msg_body])
-                case _:
-                    pass
+            # FOR FUCK'S SAKE, RENDER UPDATE TO 3.10 I WANNA USE MATCH AAAAAAAAA
+            if msg_type == "NEW_GAME":
+                packet = events.emit_event("NEW_GAME", [ws, msg_body])
+            elif msg_type == "JOIN_GAME":
+                packet = events.emit_event("JOIN_GAME", [ws, msg_body])
 
             ws.send(packet)
         except ConnectionClosed:

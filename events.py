@@ -56,7 +56,8 @@ def on(_targets, make_main : bool = False):
     return _on_decorator
 
 def emit_event(event_name, data):
-    if (ev := connections.get(event_name)) is not None:
+    ev = connections.get(event_name)
+    if ev is not None:
         return ev.emit(data)
     else:
         raise EventNotFound(event_name)
