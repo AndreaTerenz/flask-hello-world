@@ -1,5 +1,8 @@
 import json, events, os
+
 from icecream import ic
+
+import lobby
 from lobby import add_user, UserAlreadyExists, LobbyNotFound
 from simple_websocket import ConnectionClosed
 from flask import Flask
@@ -38,6 +41,12 @@ def game_socket(ws):
             ws.send(packet)
         except ConnectionClosed:
             print("Connection closed")
+
+            user_id = lobby.socket_to_user(ws)
+            lobby_id = lobby.user_to_lobby(user_id)
+
+
+
             return ""
 
 @events.on("NEW_GAME", make_main=True)
@@ -48,9 +57,10 @@ def on_new_game(data) -> str:
     user_id = msg["user_id"]
 
     try:
-        lobby_id, _ = add_user(name=user_id, socket=ws)
+        lobby_id, players = add_user(name=user_id, socket=ws)
 
         return json.dumps({
+            "type": "NEW_GAME_OK",
             "lobby_id": lobby_id,
             "players": [user_id]
         })
@@ -71,7 +81,14 @@ def on_join_game(data) -> str:
     try:
         lobby_id, players = add_user(name=user_id, socket=ws, lobby_id=lobby_id)
 
+        lobby_packet = {
+            "type": "PLAYER_JOINED",
+            "new_player": user_id
+        }
+        lobby.emit_to_lobby(lobby_id, json.dumps(lobby_packet), excepts=[user_id])
+
         return json.dumps({
+            "type": "JOIN_GAME_OK",
             "lobby_id": lobby_id,
             "players": players
         })

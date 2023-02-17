@@ -1,6 +1,7 @@
 import shortuuid
 
-shortuuid.set_alphabet("0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
+LOBBY_ID_LEN = 6
+shortuuid.set_alphabet("0123456789ABCDEFGHJKLMNPQRSTUVWXYZ")
 
 # Key: Lobby ID
 # Value: [<IDs of users in lobby>]
@@ -24,7 +25,7 @@ def add_user(name: str, socket, lobby_id: str = ""):
         raise UserAlreadyExists(name)
 
     if lobby_id == "":
-        lobby_id = shortuuid.ShortUUID().random(length=8)
+        lobby_id = shortuuid.ShortUUID().random(length=LOBBY_ID_LEN)
         lobbies[lobby_id] = [name]
     elif lobbies.get(lobby_id):
         lobbies[lobby_id].append(name)
@@ -43,6 +44,10 @@ def user_to_lobby(user: str):
         return ""
 
     return users[user]["lobby"]
+
+def socket_to_user(ws):
+    tmp = [u for u in users.keys() if users[u]["ws"] == ws]
+    return tmp[0]
 
 def emit_to_user(username, data):
     if not user_exists(username):
