@@ -1,5 +1,4 @@
 import shortuuid
-from flask_socketio import emit
 
 shortuuid.set_alphabet("0123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz")
 
