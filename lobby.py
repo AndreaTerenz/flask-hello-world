@@ -1,7 +1,8 @@
 import shortuuid
+from icecream import ic
 
 LOBBY_ID_LEN = 6
-shortuuid.set_alphabet("0123456789ABCDEFGHJKLMNPQRSTUVWXYZ")
+LOBBY_ID_ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 # Key: Lobby ID
 # Value: [<IDs of users in lobby>]
@@ -25,7 +26,7 @@ def add_user(name: str, socket, lobby_id: str = ""):
         raise UserAlreadyExists(name)
 
     if lobby_id == "":
-        lobby_id = shortuuid.ShortUUID().random(length=LOBBY_ID_LEN)
+        lobby_id = shortuuid.ShortUUID(alphabet=LOBBY_ID_ALPHABET).random(length=LOBBY_ID_LEN)
         lobbies[lobby_id] = [name]
     elif lobbies.get(lobby_id):
         lobbies[lobby_id].append(name)
@@ -38,6 +39,23 @@ def add_user(name: str, socket, lobby_id: str = ""):
     }
 
     return lobby_id, users_in_lobby(lobby_id)
+
+def remove_user(user_id: str):
+    """
+    Remove a user from its lobby
+    :param user_id: ID of the user to be removed
+    :return: Number of users left in the lobby
+    """
+    if not user_exists(user_id):
+        raise UserNotFound(user_id)
+
+    lobby_id = users[user_id]["lobby"]
+    left = len(lobbies[lobby_id]) - 1
+
+    lobbies[lobby_id].remove(user_id)
+    del users[user_id]
+
+    return left
 
 def user_to_lobby(user: str):
     if not user_exists(user):
@@ -72,6 +90,14 @@ def users_in_lobby(lobby_id):
 
     return lobbies[lobby_id]
 
+def lobby_is_empty(lobby_id):
+    if not lobby_exists(lobby_id):
+        raise LobbyNotFound(lobby_id)
+
+    return len(lobbies[lobby_id]) <= 0
+
+##################### EXCEPTIONS
+
 class LobbyException(Exception):
     """Generic lobby-related exception"""
     def __init__(self, lobby_id):
@@ -97,3 +123,9 @@ class UserNotFound(UserException):
 class UserAlreadyExists(UserException):
     """Raised when trying to add an already present user"""
     pass
+
+class UserNotInLobby(UserException, LobbyException):
+    """Raised when there's a mismatch between user_id and lobby"""
+    def __init__(self, username, lobby):
+        self.username = username
+        self.lobby = lobby
