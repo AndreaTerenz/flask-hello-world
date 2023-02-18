@@ -1,11 +1,17 @@
+import json
+
 import shortuuid
+from game import Game
 from icecream import ic
 
 LOBBY_ID_LEN = 6
 LOBBY_ID_ALPHABET = "0123456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 # Key: Lobby ID
-# Value: [<IDs of users in lobby>]
+# Value: {
+#   "state": <Game object>
+#   "players": [<IDs of users in lobby>]
+# }
 lobbies = {}
 
 # Key: User ID
@@ -27,9 +33,15 @@ def add_user(name: str, socket, lobby_id: str = ""):
 
     if lobby_id == "":
         lobby_id = shortuuid.ShortUUID(alphabet=LOBBY_ID_ALPHABET).random(length=LOBBY_ID_LEN)
-        lobbies[lobby_id] = [name]
+        lobbies[lobby_id] = {
+            "state": Game(),
+            "players": [name],
+        }
     elif lobbies.get(lobby_id):
-        lobbies[lobby_id].append(name)
+        if len(users_in_lobby(lobby_id)) == 2:
+            raise LobbyIsFull(lobby_id)
+
+        lobbies[lobby_id]["players"].append(name)
     else:
         raise LobbyNotFound(lobby_id)
 
@@ -63,6 +75,21 @@ def user_to_lobby(user: str):
 
     return users[user]["lobby"]
 
+def user_role(user: str):
+    if not user_exists(user):
+        return Game.EMPTY
+
+    lobby_id = user_to_lobby(user)
+    players = lobbies[lobby_id]["players"]
+
+    return Game.X if user == players[0] else Game.O
+
+def lobby_to_game(lobby_id: str):
+    if not lobby_exists(lobby_id):
+        return None
+
+    return lobbies[lobby_id]["state"]
+
 def socket_to_user(ws):
     tmp = [u for u in users.keys() if users[u]["ws"] == ws]
     return tmp[0]
@@ -74,13 +101,16 @@ def emit_to_user(username, data):
     ws = users[username]["ws"]
     ws.send(data)
 
-def emit_to_lobby(lobby_id, data, excepts=None):
+def emit_to_lobby(lobby_id, data: str | dict, excepts=None):
     if not lobby_exists(lobby_id):
         raise LobbyNotFound(lobby_id)
     if excepts is None:
         excepts = []
 
-    targets = [u for u in lobbies[lobby_id] if not(u in excepts)]
+    if type(data) is dict:
+        data = json.dumps(data)
+
+    targets = [u for u in users_in_lobby(lobby_id) if not(u in excepts)]
     for user in targets:
         emit_to_user(user, data)
 
@@ -88,7 +118,7 @@ def users_in_lobby(lobby_id):
     if not lobby_exists(lobby_id):
         raise LobbyNotFound(lobby_id)
 
-    return lobbies[lobby_id]
+    return lobbies[lobby_id]["players"]
 
 def lobby_is_empty(lobby_id):
     if not lobby_exists(lobby_id):
@@ -98,7 +128,7 @@ def lobby_is_empty(lobby_id):
 
 ##################### EXCEPTIONS
 
-class LobbyException(Exception):
+class LobbyException(BaseException):
     """Generic lobby-related exception"""
     def __init__(self, lobby_id):
         self.lobby_id = lobby_id
@@ -111,7 +141,12 @@ class LobbyAlreadyExists(LobbyException):
     """Raised when trying to create a lobby that already exists"""
     pass
 
-class UserException(Exception):
+class LobbyIsFull(LobbyException):
+    """Raised when trying to add too many players to a lobby"""
+    def __str__(self):
+        return f"{self.lobby_id} ({users_in_lobby(self.lobby_id)})"
+
+class UserException(BaseException):
     """Generic user-related exception"""
     def __init__(self, username):
         self.username = username

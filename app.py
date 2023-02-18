@@ -1,6 +1,8 @@
 import os
 from icecream import ic
 
+from game import Game
+
 if os.getenv("DEPLOYED"):
     ic.disable()
 
@@ -16,6 +18,7 @@ sock = Sock(app)
 def hello_world():
     return 'Hello, World!'
 
+
 @sock.route("/game-socket")
 def game_socket(ws):
     while True:
@@ -29,12 +32,14 @@ def game_socket(ws):
                 continue
 
             packet = f"Echo: {data}"
-
+            ic(msg_type)
             # FOR FUCK'S SAKE, RENDER UPDATE TO 3.10 I WANNA USE MATCH AAAAAAAAA
             if msg_type == "NEW_GAME":
                 packet = on_new_game(ws, msg_body)
             elif msg_type == "JOIN_GAME":
                 packet = on_join_game(ws, msg_body)
+            elif msg_type == "MOVE":
+                packet = on_player_move(msg_body)
 
             ws.send(packet)
         except ConnectionClosed:
@@ -58,7 +63,7 @@ def on_new_game(ws, msg) -> str:
 
 def on_join_game(ws, msg) -> str:
     user_id = msg["user_id"]
-    lobby_id = msg.get("lobby_id", "")
+    lobby_id = msg["lobby_id"]
 
     if lobby_id == "":
         return ""
@@ -73,7 +78,8 @@ def on_join_game(ws, msg) -> str:
             "lobby_id": lobby_id,
             "players": players
         })
-    except lobby.LobbyNotFound | lobby.UserAlreadyExists:
+    except lobby.LobbyNotFound | lobby.UserAlreadyExists | lobby.LobbyIsFull as e:
+        print(e)
         return ""
 
 def on_player_joined(new_user_id, lobby_id):
@@ -93,6 +99,34 @@ def on_player_left(ws):
             "type": "PLAYER_LEFT",
             "players": lobby.users_in_lobby(lobby_id)
         }
-        lobby.emit_to_lobby(lobby_id, json.dumps(lobby_packet))
+        lobby.emit_to_lobby(lobby_id, lobby_packet)
     else:
         print(f"Lobby {lobby_id} closed")
+
+def on_player_move(msg):
+    user_id = msg["user_id"]
+    move_r = msg["move_r"]
+    move_c = msg["move_c"]
+
+    lobby_id = lobby.user_to_lobby(user_id)
+    lobby_game = lobby.lobby_to_game(lobby_id)
+    user_role = lobby.user_role(user_id)
+    lobby_game.set_cell_at(move_r, move_c, user_role)
+
+    lobby_packet = {
+        "type": "OTHER_MOVED",
+        "move_r": move_r,
+        "move_c": move_c
+    }
+    lobby.emit_to_lobby(lobby_id, ic(lobby_packet), excepts=[user_id])
+
+    winner = lobby_game.check_gameover()
+    if ic(winner) != Game.EMPTY:
+        lobby_packet = {
+            "type": "GAME_OVER",
+            "winner": winner,
+        }
+        lobby.emit_to_lobby(lobby_id, ic(lobby_packet))
+
+
+    return ""
