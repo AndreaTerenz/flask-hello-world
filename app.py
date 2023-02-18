@@ -78,7 +78,7 @@ def on_join_game(ws, msg) -> str:
             "lobby_id": lobby_id,
             "players": players
         })
-    except lobby.LobbyNotFound | lobby.UserAlreadyExists | lobby.LobbyIsFull as e:
+    except (lobby.LobbyNotFound, lobby.UserAlreadyExists, lobby.LobbyIsFull) as e:
         print(e)
         return ""
 

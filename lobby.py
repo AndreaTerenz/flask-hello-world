@@ -1,4 +1,5 @@
 import json
+from typing import Union
 
 import shortuuid
 from game import Game
@@ -101,7 +102,7 @@ def emit_to_user(username, data):
     ws = users[username]["ws"]
     ws.send(data)
 
-def emit_to_lobby(lobby_id, data: str | dict, excepts=None):
+def emit_to_lobby(lobby_id, data: Union[str, dict], excepts=None):
     if not lobby_exists(lobby_id):
         raise LobbyNotFound(lobby_id)
     if excepts is None:
