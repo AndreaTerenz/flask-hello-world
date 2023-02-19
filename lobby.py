@@ -85,6 +85,18 @@ def user_role(user: str):
 
     return Game.X if user == players[0] else Game.O
 
+def role_to_user(lobby_id: str, role: int):
+    if not lobby_exists(lobby_id):
+        return ""
+
+    players = users_in_lobby(lobby_id)
+    if role == Game.X:
+        return players[0]
+    elif role == Game.O:
+        return players[1]
+
+    return ""
+
 def lobby_to_game(lobby_id: str):
     if not lobby_exists(lobby_id):
         return None

@@ -1,12 +1,11 @@
 import os
 from icecream import ic
 
-from game import Game
-
 if os.getenv("DEPLOYED"):
     ic.disable()
 
 import json, lobby
+from game import Game
 from simple_websocket import ConnectionClosed
 from flask import Flask
 from flask_sock import Sock
@@ -52,7 +51,7 @@ def on_new_game(ws, msg) -> str:
 
     try:
         lobby_id, players = lobby.add_user(name=user_id, socket=ws)
-
+        print(f"Added user '{user_id}' and created lobby '{lobby_id}'")
         return json.dumps({
             "type": "NEW_GAME_OK",
             "lobby_id": lobby_id,
@@ -70,7 +69,7 @@ def on_join_game(ws, msg) -> str:
 
     try:
         lobby_id, players = lobby.add_user(name=user_id, socket=ws, lobby_id=lobby_id)
-
+        print(f"Added user '{user_id}' to lobby '{lobby_id}'")
         on_player_joined(user_id, lobby_id)
 
         return json.dumps({
@@ -113,6 +112,8 @@ def on_player_move(msg):
     user_role = lobby.user_role(user_id)
     lobby_game.set_cell_at(move_r, move_c, user_role)
 
+    print(f"User '{user_id}' (lobby '{lobby_id}') made move ({move_r},{move_c})")
+
     lobby_packet = {
         "type": "OTHER_MOVED",
         "move_r": move_r,
@@ -126,6 +127,13 @@ def on_player_move(msg):
             "type": "GAME_OVER",
             "winner": winner,
         }
+
+        winner_name = "[draw]"
+        if winner != Game.DRAW:
+            winner_name = lobby.role_to_user(lobby_id, winner)
+
+        print(f"Game '{lobby_id}' won by '{winner_name}'")
+
         lobby.emit_to_lobby(lobby_id, ic(lobby_packet))
 
 
